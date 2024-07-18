@@ -1,62 +1,44 @@
 <?php
 
+session_start();
+require_once 'funcs.php';
+loginCheck();
 
-require_once ('funcs.php');
+//1. POSTつぶやき取得
+$content = $_POST['content'];
+$user_id = $_SESSION['user_id'];
 
+// 画像アップロードの処理
+$image = '';
+if (isset($_FILES['image'])) {
+    // フォームから画像が送られてきたら。
+    // ファイルの保存先を生成
+    $upload_file = $_FILES['image']['tmp_name'];
+    $extension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+    $new_name = uniqid() . '.' . $extension;
+    $image_path = 'img/' . $new_name;
 
-/**
- * 1. index.phpのフォームの部分がおかしいので、ここを書き換えて、
- * insert.phpにPOSTでデータが飛ぶようにしてください。
- * 2. insert.phpで値を受け取ってください。
- * 3. 受け取ったデータをバインド変数に与えてください。
- * 4. index.phpフォームに書き込み、送信を行ってみて、実際にPhpMyAdminを確認してみてください！
- */
+    // 一時保存先から生成したファイルの保存先に移動
+    if (move_uploaded_file($upload_file, $image_path)) {
+        // contentsテーブルに保存するために、ファイルパスを変数に入れる。
+        $image = $image_path;
+    }
+}
 
-
-
-//1. POSTデータ取得
-$date = $_POST['date'];
-$material = $_POST['material'];
-$form = $_POST['form'];
-$thickness = $_POST['thickness'];
-$size = $_POST['size'];
-$price = $_POST['price'];
-
-// // var_dumpを実行
-// var_dump($date, $material, $form, $thickness, $size, $price);
-// // 処理を停止してvar_dumpの結果を確認する場合
-// exit;
-
-// ローカル
+//2. DB接続します
 $pdo = db_conn();
 
-//３．データ登録SQL作成
-// 1. SQL文を用意
-  $stmt = $pdo->prepare('INSERT INTO kadai02_table(id, material, form, thickness, size, price, date) 
-  VALUES (NULL, :material, :form, :thickness, :size, :price, :date)');
+//３．つぶやき登録SQL作成
+$stmt = $pdo->prepare('INSERT INTO contents(user_id, content, image, created_at)
+                        VALUES(:user_id, :content, :image, NOW());');
+$stmt->bindValue(':content', $content, PDO::PARAM_STR);
+$stmt->bindValue(':user_id', $user_id, PDO::PARAM_INT);
+$stmt->bindValue(':image', $image, PDO::PARAM_STR);
+$status = $stmt->execute(); //実行
 
-//  2. バインド変数を用意
-// Integer 数値の場合 PDO::PARAM_INT
-// String文字列の場合 PDO::PARAM_STR
-
-$stmt->bindValue(':date', $date, PDO::PARAM_STR);
-$stmt->bindValue(':material', $material, PDO::PARAM_STR);
-$stmt->bindValue(':form', $form, PDO::PARAM_STR);
-$stmt->bindValue(':thickness', $thickness, PDO::PARAM_STR);
-$stmt->bindValue(':size', $size, PDO::PARAM_STR);
-$stmt->bindValue(':price', $price, PDO::PARAM_STR);
-
-//  3. 実行
-$status = $stmt->execute();
-
-//４．データ登録処理後
-if($status === false){
-  //SQL実行時にエラーがある場合（エラーオブジェクト取得して表示）
-  $error = $stmt->errorInfo();
-  exit('ErrorMessage:'.$error[2]);
-}else{
-  //５．index.phpへリダイレクト
-  header('Location: index.php');
-
+//４．つぶやき登録処理後
+if (!$status) {
+    sql_error($stmt);
+} else {
+    redirect('select.php');
 }
-?>
